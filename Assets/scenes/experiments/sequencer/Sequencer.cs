@@ -8,7 +8,7 @@ public class Sequencer : MonoBehaviour
 	public OnMeasure onMeasure;
 	public delegate void OnBeat();
 	public OnMeasure onBeat;
-
+	public Button[,] buttons;
 	public bool setup = false;
 	public MidiChannel[] channelMap;
 	public int[] keyMap;
@@ -16,24 +16,24 @@ public class Sequencer : MonoBehaviour
 		bpm = 120,
 		width = 8, 
 		height = 10;
-
-	public Button[,] buttons;
-	GameObject[] indicators;
 	[HideInInspector] public float space = 0.1f;
+	Renderer[] indicatorLights;
+	bool playing = false;
 
-
+	
 	void Start()
 	{
 		buttons = new Button[width, height];
-		indicators = new GameObject[width];
+		indicatorLights = new Renderer[width];
 
 		for(int w=0; w<width; w++){ //per row
-			indicators[w] = GameObject.CreatePrimitive (PrimitiveType.Cube);
-			indicators[w].name = "indicator "+w;
-			indicators[w].transform.parent = transform;
-			indicators[w].transform.localPosition = new Vector3(w + (space*w), 1 + space, 0);
-			indicators[w].GetComponent<Renderer>().material.color = Color.black;
-			Destroy(indicators[w].GetComponent<Collider>());
+			var indi = GameObject.CreatePrimitive (PrimitiveType.Cube);
+			indi.name = "indicator "+w;
+			indi.transform.parent = transform;
+			indi.transform.localPosition = new Vector3(w + (space*w), 1 + space, 0);
+			indicatorLights[w] = indi.GetComponent<Renderer>();
+			indicatorLights[w].material.color = Color.black;
+			Destroy(indi.GetComponent<Collider>());
 
 
 			for(int h=0; h<height; h++){ //per column in row
@@ -44,8 +44,14 @@ public class Sequencer : MonoBehaviour
 				buttons[w,h] = (go.AddComponent<Button>()).Init(w,h);
 			}
 		}
+	}
 
-		StartCoroutine ("Play");
+	public void Play(){
+		StartCoroutine ("_Play");
+		playing = true;
+	}
+	public void Stop(){
+		playing = false;
 	}
 
 	void RandomizeEnabled()
@@ -54,9 +60,16 @@ public class Sequencer : MonoBehaviour
 			if(b.randomize){b.RandomEnabled();}
 		}
 	}
-
-	IEnumerator Play()
+	void TurnOffIndicators()
 	{
+		foreach(Renderer r in indicatorLights){
+			r.material.color = Color.black;
+		}
+	}
+
+	IEnumerator _Play()
+	{
+		bool kill = false;
 		List<int> playedNotes = new List<int>();
 
 		while (true) {//per measure
@@ -66,8 +79,7 @@ public class Sequencer : MonoBehaviour
 			for(int w=0; w<width; w++){//per beat
 				if(onBeat != null){ onBeat();}
 
-				var r = indicators[w].GetComponent<Renderer>();
-				r.material.color = Color.magenta;
+				indicatorLights[w].material.color = Color.magenta;
 
 				for(int h=0; h<height; h++){//per selected
 					if(buttons[w,h].enabled){
@@ -84,8 +96,17 @@ public class Sequencer : MonoBehaviour
 					playedNotes.Remove(playedNotes[0]);
 				}
 
-				r.material.color = Color.black;
+				indicatorLights[w].material.color = Color.black;
+
+				//check playing after each 
+				if(!playing){
+					TurnOffIndicators();
+					kill = true;
+					break;
+				}
 			}
+
+			if(kill){break;}
 		}
 	}
 
