@@ -4,14 +4,14 @@ using System.Collections.Generic;
 
 public class Sequencer : MonoBehaviour 
 {
-	public enum ButtonType {Play, Empty}
+	public enum ButtonType {Play, Stop, Empty}
 	public ButtonType[] controlButtons;
 
 	public delegate void OnMeasure();
 	public OnMeasure onMeasure;
 	public delegate void OnBeat();
 	public OnMeasure onBeat;
-	public Button[,] buttons;
+	public GridButton[,] gridButtons;
 	public bool setup = false;
 	public MidiChannel[] channelMap;
 	public int[] keyMap;
@@ -22,6 +22,11 @@ public class Sequencer : MonoBehaviour
 	[HideInInspector] public float space = 0.1f;
 	Renderer[] indicatorLights;
 	bool playing = false;
+	List<int> playedNotes = new List<int>();
+	int 
+		tickCount = 0, 
+		currentTick = 0;
+
 
 	
 	void Start()
@@ -31,11 +36,14 @@ public class Sequencer : MonoBehaviour
 			if(type == ButtonType.Play){
 				(GameObject.CreatePrimitive (PrimitiveType.Cube).AddComponent<PlayButton>()).Init(this);
 			}
+			if(type == ButtonType.Stop){
+				(GameObject.CreatePrimitive (PrimitiveType.Cube).AddComponent<StopButton>()).Init(this);
+			}
 		}
 		ControlButton.ResetStaticGrid ();
 
 		//note grid
-		buttons = new Button[width, height];
+		gridButtons = new GridButton[width, height];
 		indicatorLights = new Renderer[width];
 
 		for(int w=0; w<width; w++){ //per row
@@ -53,22 +61,27 @@ public class Sequencer : MonoBehaviour
 				go.name = w+":"+h;
 				go.transform.parent = transform;
 				go.transform.localPosition = new Vector3(w + (space*w), -h - (space*h), 0);
-				buttons[w,h] = (go.AddComponent<Button>()).Init(w,h);
+				gridButtons[w,h] = (go.AddComponent<GridButton>()).Init(w,h);
 			}
 		}
 	}
 
 	public void Play(){
-		StartCoroutine ("_Play");
-		playing = true;
+		Clock.instance.onTick += OnTick;
 	}
 	public void Stop(){
-		playing = false;
+		ReleasePlayedNotes ();
+		TurnOffIndicators ();
+		Clock.instance.onTick -= OnTick;
+	}
+	public void ResetPlayhead()
+	{
+		tickCount = 0;
 	}
 
 	void RandomizeEnabled()
 	{
-		foreach(Button b in buttons){
+		foreach(GridButton b in gridButtons){
 			if(b.randomize){b.RandomEnabled();}
 		}
 	}
@@ -79,51 +92,47 @@ public class Sequencer : MonoBehaviour
 		}
 	}
 
-	IEnumerator _Play()
+	void OnTick()
 	{
-		bool kill = false;
-		List<int> playedNotes = new List<int>();
+		//reset from last tick
+		ReleasePlayedNotes ();
+		indicatorLights[currentTick].material.color = Color.black;
 
-		while (true) {//per measure
+		//update pointers for current tick
+		currentTick = tickCount % width;
+		tickCount++;
+
+
+		if(currentTick == 0){//per measure
 			RandomizeEnabled();
 			if(onMeasure != null){onMeasure();}
+		}
+		if(currentTick % Clock.instance.ticksPerBeat == 0){//per beat
+			if(onBeat != null){ onBeat();}
+		}
 
-			for(int w=0; w<width; w++){//per beat
-				if(onBeat != null){ onBeat();}
-
-				indicatorLights[w].material.color = Color.magenta;
-
-				for(int h=0; h<height; h++){//per selected
-					if(buttons[w,h].enabled){
-						playedNotes.Add(h);
-						MidiChannel ch = (setup ? channelMap[h] : channelMap[0]);
-						MidiOut.SendNoteOn(ch, keyMap[h], 1f);
-					}
-				}
-
-				yield return new WaitForSeconds (60f / (float)bpm);
-
-				while(playedNotes.Count > 0){//after selected
-					MidiOut.SendNoteOff((setup ? channelMap[playedNotes[0]] : channelMap[0]), keyMap[playedNotes[0]]);
-					playedNotes.Remove(playedNotes[0]);
-				}
-
-				indicatorLights[w].material.color = Color.black;
-
-				//check playing after each 
-				if(!playing){
-					TurnOffIndicators();
-					kill = true;
-					break;
-				}
+		//per tick
+		indicatorLights[currentTick].material.color = Color.magenta;
+		
+		for(int h=0; h<height; h++){//per selected
+			if(gridButtons[currentTick,h].enabled){
+				playedNotes.Add(h);
+				MidiChannel ch = (setup ? channelMap[h] : channelMap[0]);
+				MidiOut.SendNoteOn(ch, keyMap[h], 1f);
 			}
+		}
+	}
 
-			if(kill){break;}
+	void ReleasePlayedNotes()
+	{
+		while(playedNotes.Count > 0){//after selected
+			MidiOut.SendNoteOff((setup ? channelMap[playedNotes[0]] : channelMap[0]), keyMap[playedNotes[0]]);
+			playedNotes.Remove(playedNotes[0]);
 		}
 	}
 
 
-	public class Button : MonoBehaviour 
+	public class GridButton : MonoBehaviour 
 	{
 		public int x, y;
 		Color baseColor = Color.white;
@@ -147,7 +156,7 @@ public class Sequencer : MonoBehaviour
 		}
 
 
-		public Button Init(int x, int y)
+		public GridButton Init(int x, int y)
 		{
 			this.x = x;
 			this.y = y;
@@ -178,6 +187,7 @@ public class Sequencer : MonoBehaviour
 	}
 	public class ControlButton : MonoBehaviour
 	{
+		protected string buttonName = "button";
 		protected Sequencer sequencer;
 		protected Color baseColor = Color.grey;
 		protected GameObject button;
@@ -197,7 +207,7 @@ public class Sequencer : MonoBehaviour
 		public ControlButton Init(Sequencer sequencer)
 		{
 			this.sequencer = sequencer;
-			gameObject.name = "play button";
+			gameObject.name = buttonName;
 			gameObject.transform.parent = sequencer.transform;
 			gameObject.transform.localPosition = new Vector3 ( x+(x*sequencer.space), 2.2f + y +(y*sequencer.space), 0 );
 			renderer = gameObject.GetComponent<Renderer> ();
@@ -218,7 +228,16 @@ public class Sequencer : MonoBehaviour
 	}
 	public class PlayButton : ControlButton
 	{
+		void Awake(){buttonName = "play button";}
 		public override void OnActivate(){sequencer.Play ();}
 		public override void OnDeactivate(){sequencer.Stop ();}
+	}
+	public class StopButton : ControlButton
+	{
+		void Awake(){buttonName = "stop button";}
+		public override void OnActivate(){
+			sequencer.Stop ();
+			sequencer.ResetPlayhead();
+			active = false;}
 	}
 }
