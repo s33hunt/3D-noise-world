@@ -4,6 +4,9 @@ using System.Collections.Generic;
 
 public class Sequencer : MonoBehaviour 
 {
+	public enum ButtonType {Play, Empty}
+	public ButtonType[] controlButtons;
+
 	public delegate void OnMeasure();
 	public OnMeasure onMeasure;
 	public delegate void OnBeat();
@@ -23,6 +26,15 @@ public class Sequencer : MonoBehaviour
 	
 	void Start()
 	{
+		//control buttons
+		foreach (ButtonType type in controlButtons) {
+			if(type == ButtonType.Play){
+				(GameObject.CreatePrimitive (PrimitiveType.Cube).AddComponent<PlayButton>()).Init(this);
+			}
+		}
+		ControlButton.ResetStaticGrid ();
+
+		//note grid
 		buttons = new Button[width, height];
 		indicatorLights = new Renderer[width];
 
@@ -163,5 +175,50 @@ public class Sequencer : MonoBehaviour
 				}
 			}
 		}
+	}
+	public class ControlButton : MonoBehaviour
+	{
+		protected Sequencer sequencer;
+		protected Color baseColor = Color.grey;
+		protected GameObject button;
+		protected static int x, y;
+		Renderer renderer;
+		bool _active = false;
+		protected bool active {
+			get { return _active;}
+			set{ 
+				renderer.material.color = (value ? Color.red : baseColor);
+				_active = value; 
+			}
+		}
+
+		public static void ResetStaticGrid(){x = 0;y = 0;}
+
+		public ControlButton Init(Sequencer sequencer)
+		{
+			this.sequencer = sequencer;
+			gameObject.name = "play button";
+			gameObject.transform.parent = sequencer.transform;
+			gameObject.transform.localPosition = new Vector3 ( x+(x*sequencer.space), 2.2f + y +(y*sequencer.space), 0 );
+			renderer = gameObject.GetComponent<Renderer> ();
+			renderer.material.color = baseColor;
+
+			x++;
+			if(x >= sequencer.width){x=0;y++;}
+			
+			return this;
+		}
+		
+		public virtual void OnActivate(){}
+		public virtual void OnDeactivate(){}
+		void OnMouseDown(){
+			active = !active;
+			if(active){OnActivate();}else{OnDeactivate();}
+		}
+	}
+	public class PlayButton : ControlButton
+	{
+		public override void OnActivate(){sequencer.Play ();}
+		public override void OnDeactivate(){sequencer.Stop ();}
 	}
 }
