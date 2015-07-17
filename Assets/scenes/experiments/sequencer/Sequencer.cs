@@ -5,25 +5,25 @@ using System.Collections.Generic;
 public class Sequencer : MonoBehaviour 
 {
 	public enum ButtonType {Play, Stop, Empty}
-	public ButtonType[] controlButtons;
-
 	public delegate void OnMeasure();
-	public OnMeasure onMeasure;
 	public delegate void OnBeat();
 	public OnMeasure onBeat;
+	public OnMeasure onMeasure;
+
 	public GridButton[,] gridButtons;
-	public bool setup = false;
+	public ButtonType[] controlButtons;
 	public MidiChannel[] channelMap;
 	public int[] keyMap;
 	public int
 		bpm = 120,
-		width = 8, 
-		height = 10;
+		width = 8;
+
 	[HideInInspector] public float space = 0.1f;
 	Renderer[] indicatorLights;
 	bool playing = false;
 	List<int> playedNotes = new List<int>();
 	int 
+		height,
 		tickCount = 0, 
 		currentTick = 0;
 
@@ -31,6 +31,9 @@ public class Sequencer : MonoBehaviour
 	
 	void Start()
 	{
+		//init 
+		height = keyMap.Length;
+
 		//control buttons
 		foreach (ButtonType type in controlButtons) {
 			if(type == ButtonType.Play){
@@ -60,7 +63,7 @@ public class Sequencer : MonoBehaviour
 				var go = GameObject.CreatePrimitive (PrimitiveType.Cube);
 				go.name = w+":"+h;
 				go.transform.parent = transform;
-				go.transform.localPosition = new Vector3(w + (space*w), -h - (space*h), 0);
+				go.transform.localPosition = new Vector3(w + (space*w), -((height-1)+(height*space))   + (h + (space*h)), 0);
 				gridButtons[w,h] = (go.AddComponent<GridButton>()).Init(w,h);
 			}
 		}
@@ -117,7 +120,7 @@ public class Sequencer : MonoBehaviour
 		for(int h=0; h<height; h++){//per selected
 			if(gridButtons[currentTick,h].enabled){
 				playedNotes.Add(h);
-				MidiChannel ch = (setup ? channelMap[h] : channelMap[0]);
+				MidiChannel ch = (channelMap.Length > 1 ? channelMap[h] : channelMap[0]);
 				MidiOut.SendNoteOn(ch, keyMap[h], 1f);
 			}
 		}
@@ -126,7 +129,7 @@ public class Sequencer : MonoBehaviour
 	void ReleasePlayedNotes()
 	{
 		while(playedNotes.Count > 0){//after selected
-			MidiOut.SendNoteOff((setup ? channelMap[playedNotes[0]] : channelMap[0]), keyMap[playedNotes[0]]);
+			MidiOut.SendNoteOff((channelMap.Length > 1 ? channelMap[playedNotes[0]] : channelMap[0]), keyMap[playedNotes[0]]);
 			playedNotes.Remove(playedNotes[0]);
 		}
 	}
