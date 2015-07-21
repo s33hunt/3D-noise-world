@@ -14,10 +14,17 @@ public class Sequencer : MonoBehaviour
 	public ButtonType[] controlButtons;
 	public MidiChannel[] channelMap;
 	public int[] keyMap;
-	public int
-		bpm = 120,
-		width = 8;
+	public int 
+		width = 8, 
+		beatResolution = 4;
 
+	public Material baseMat;
+	public Color 
+		indicatorColor, indicatorColorActive,
+		gridColor, gridColorActive, gridColorRandomized,
+		playColor, playColorActive,
+		buttonColor, buttonColorActive;
+	
 	[HideInInspector] public float space = 0.1f;
 	Renderer[] indicatorLights;
 	bool playing = false;
@@ -55,7 +62,7 @@ public class Sequencer : MonoBehaviour
 			indi.transform.parent = transform;
 			indi.transform.localPosition = new Vector3(w + (space*w), 1 + space, 0);
 			indicatorLights[w] = indi.GetComponent<Renderer>();
-			indicatorLights[w].material.color = Color.black;
+			indicatorLights[w].material.color = indicatorColor;
 			Destroy(indi.GetComponent<Collider>());
 
 
@@ -91,7 +98,7 @@ public class Sequencer : MonoBehaviour
 	void TurnOffIndicators()
 	{
 		foreach(Renderer r in indicatorLights){
-			r.material.color = Color.black;
+			r.material.color = indicatorColor;
 		}
 	}
 
@@ -99,7 +106,7 @@ public class Sequencer : MonoBehaviour
 	{
 		//reset from last tick
 		ReleasePlayedNotes ();
-		indicatorLights[currentTick].material.color = Color.black;
+		indicatorLights[currentTick].material.color = indicatorColor;
 
 		//update pointers for current tick
 		currentTick = tickCount % width;
@@ -115,7 +122,7 @@ public class Sequencer : MonoBehaviour
 		}
 
 		//per tick
-		indicatorLights[currentTick].material.color = Color.magenta;
+		indicatorLights[currentTick].material.color = indicatorColorActive;
 		
 		for(int h=0; h<height; h++){//per selected
 			if(gridButtons[currentTick,h].enabled){
@@ -135,10 +142,13 @@ public class Sequencer : MonoBehaviour
 	}
 
 
+
 	public class GridButton : MonoBehaviour 
 	{
 		public int x, y;
-		Color baseColor = Color.white;
+		Sequencer sequencer;
+		Renderer renderer;
+		Color baseColor;
 		bool 
 			_enabled = false,
 			_randomize = false;
@@ -146,18 +156,28 @@ public class Sequencer : MonoBehaviour
 		public bool randomize {
 			get { return _randomize; }
 			set { 
-				baseColor = value ? Color.green : Color.white; 
+				baseColor = value ? sequencer.gridColorRandomized : sequencer.gridColor; 
+				renderer.material = sequencer.baseMat;
+				renderer.material.color = baseColor;
 				_randomize = value; 
 			}
 		}
 		public bool enabled {
 			get { return _enabled;}
 			set {
-				gameObject.GetComponent<Renderer>().material.color = (value ? Color.blue : baseColor);
+				renderer.material.color = (value ? sequencer.gridColorActive : baseColor);
 				_enabled = value;
 			}
 		}
 
+
+		void Awake()
+		{
+			this.sequencer = transform.parent.GetComponent<Sequencer> ();
+			renderer = GetComponent<Renderer> ();
+			randomize = false; // to set baseColor
+			renderer.material.color = baseColor;
+		}
 
 		public GridButton Init(int x, int y)
 		{
@@ -176,7 +196,9 @@ public class Sequencer : MonoBehaviour
 			if (Input.GetKey (KeyCode.LeftShift)) {
 				randomize = !randomize;
 				enabled = false;
+				renderer.material.color = baseColor;
 			}
+
 		}
 		void OnMouseEnter(){
 			if (Input.GetMouseButton (0)) {
@@ -184,15 +206,17 @@ public class Sequencer : MonoBehaviour
 				if (Input.GetKey (KeyCode.LeftShift)) {
 					randomize = !randomize;
 					enabled = false;
+					renderer.material.color = baseColor;
 				}
 			}
 		}
 	}
+
 	public class ControlButton : MonoBehaviour
 	{
 		protected string buttonName = "button";
 		protected Sequencer sequencer;
-		protected Color baseColor = Color.grey;
+		protected Color baseColor;
 		protected GameObject button;
 		protected static int x, y;
 		Renderer renderer;
@@ -200,7 +224,7 @@ public class Sequencer : MonoBehaviour
 		protected bool active {
 			get { return _active;}
 			set{ 
-				renderer.material.color = (value ? Color.red : baseColor);
+				renderer.material.color = (value ? sequencer.buttonColorActive : baseColor);
 				_active = value; 
 			}
 		}
@@ -214,7 +238,7 @@ public class Sequencer : MonoBehaviour
 			gameObject.transform.parent = sequencer.transform;
 			gameObject.transform.localPosition = new Vector3 ( x+(x*sequencer.space), 2.2f + y +(y*sequencer.space), 0 );
 			renderer = gameObject.GetComponent<Renderer> ();
-			renderer.material.color = baseColor;
+			renderer.material.color = sequencer.buttonColor;
 
 			x++;
 			if(x >= sequencer.width){x=0;y++;}
