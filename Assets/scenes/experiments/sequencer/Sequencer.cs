@@ -15,6 +15,7 @@ namespace Sequencer
 		[HideInInspector] public IndicatorLights lights;
 		[HideInInspector] public Colors colors;
 		[HideInInspector] public int height;
+		[HideInInspector] public int width {get {return measure*beatResolution;}}
 		public delegate void OnMeasure();
 		public delegate void OnBeat();
 		public OnMeasure onBeat;
@@ -22,10 +23,11 @@ namespace Sequencer
 		public MidiChannel[] channelMap;
 		public int[] keyMap;
 		public int 
-			width = 8, 
+			measures = 2,
+			measure = 4, 
 			beatResolution = 4;
 		private Grid noteGrid;
-		private List<Grid> FXGrids = new List<Grid>();
+		private CCSignalGrid[] CCGrids;
 		private List<int> playedNotes = new List<int>();
 		private int 
 			tickCount = 0, 
@@ -38,6 +40,7 @@ namespace Sequencer
 			height = keyMap.Length;
 			lights = GetComponent<IndicatorLights> ();
 			colors = GetComponent<Colors> ();
+			CCGrids = GetComponents<CCSignalGrid> ();
 
 			//create note grid
 			noteGrid = gameObject.AddComponent<Grid> ();

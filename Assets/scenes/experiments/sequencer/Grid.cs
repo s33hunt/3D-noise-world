@@ -5,21 +5,25 @@ namespace Sequencer
 {
 	public class Grid : MonoBehaviour 
 	{
-		public Sequencer sequencer;
-		public GridButton[,] gridButtons;
-		public int 
-			width = 8, 
+		[HideInInspector] public Sequencer sequencer;
+		[HideInInspector] public GridButton[,] gridButtons;
+		[HideInInspector] public int 
+			width = 8,
 			height = 10;
 		private int 
 			tickCount = 0, 
 			currentTick = 0;
 
 		
-		void Start()
+		protected virtual void Awake()
 		{
 			sequencer = transform.GetComponent<Sequencer> ();
 			width = sequencer.width;
 			height = sequencer.height;
+		}
+
+		void Start()
+		{
 			BuildGrid ();
 		}
 
@@ -27,19 +31,22 @@ namespace Sequencer
 		{
 			gridButtons = new GridButton[width, height];
 
+			Transform gridParent = new GameObject ("grid").transform;
+			gridParent.parent = transform;
+			gridParent.localPosition = Vector3.zero;
 
 			for(int w=0; w<width; w++){ //per row
 				for(int h=0; h<height; h++){ //per column in row
 					var go = GameObject.CreatePrimitive (PrimitiveType.Cube);
-					go.name = "("+w+","+h+")";
-					go.transform.parent = transform;
+					go.name = "("+w+","+(height-1-h)+")";
+					go.transform.parent = gridParent;
 					go.transform.localScale = new Vector3(sequencer.units.buttonWidth,sequencer.units.buttonWidth, 0.005f);
 					go.transform.localPosition = new Vector3(
 						(w * sequencer.units.buttonWidth) + (sequencer.units.margin * w), 
-						sequencer.units.gridHeight + (h * sequencer.units.buttonWidth) + (sequencer.units.margin * h), 
+						- (h * sequencer.units.buttonWidth) - (sequencer.units.margin * h), 
 						0
 					);
-					gridButtons[w,h] = (go.AddComponent<GridButton>()).Init(w,h);
+					gridButtons[w,height-1-h] = (go.AddComponent<GridButton>()).Init(w,h);
 				}
 			}
 		}
@@ -73,7 +80,7 @@ namespace Sequencer
 			
 			void Awake()
 			{
-				this.grid = transform.parent.GetComponent<Grid> ();
+				this.grid = transform.parent.parent.GetComponent<Grid> ();
 				renderer = GetComponent<Renderer> ();
 				randomize = false; // to set baseColor
 				renderer.material.color = baseColor;

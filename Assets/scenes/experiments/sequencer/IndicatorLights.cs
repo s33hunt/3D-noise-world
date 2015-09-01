@@ -14,6 +14,7 @@ namespace Sequencer
 		{
 			sequencer = GetComponent<Sequencer> ();
 			lights = new Renderer[sequencer.width];
+			//sequencer.onBeat += 
 			BuildGrid ();
 		}
 
@@ -28,7 +29,11 @@ namespace Sequencer
 				indi.name = "indicator "+w;
 				indi.transform.parent = indiParent;
 				indi.transform.localScale = new Vector3(sequencer.units.buttonWidth,sequencer.units.buttonWidth, 0.005f);
-				indi.transform.localPosition = new Vector3((w * sequencer.units.buttonWidth) + (sequencer.units.margin * w), 0,0);
+				indi.transform.localPosition = new Vector3(
+					(w * sequencer.units.buttonWidth) + (sequencer.units.margin * w), 
+					sequencer.units.buttonWidth + sequencer.units.margin,
+					0
+				);
 				lights[w] = indi.GetComponent<Renderer>();
 				lights[w].material.color = sequencer.colors.indicatorColor;
 				Destroy(indi.GetComponent<Collider>());
